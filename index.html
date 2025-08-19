@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enquiry Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #333; padding: 6px; }
+    .editable { min-width: 200px; }
+    .bold-btn { margin-left: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Enquiry Specification Sheet</h2>
+  <table id="specTable">
+    <tr>
+      <td>7.20</td>
+      <td class="editable" contenteditable="true">Max. Sound Level at 1.0 m distance with / without insulation</td>
+    </tr>
+    <tr>
+      <td>7.21</td>
+      <td class="editable" contenteditable="true">Area / specs for insulation</td>
+    </tr>
+    <tr>
+      <td>7.22</td>
+      <td class="editable" contenteditable="true"><b>Impeller & Shaft Assembly</b></td>
+    </tr>
+    <tr>
+      <td>7.22.1</td>
+      <td class="editable" contenteditable="true">Impeller dia.</td>
+    </tr>
+    <tr>
+      <td>7.22.1.1</td>
+      <td class="editable" contenteditable="true">Material & thickness of Back plate</td>
+    </tr>
+  </table>
+
+  <br>
+  <button onclick="toggleBold()">Toggle Bold on Selection</button>
+
+  <script>
+    function toggleBold() {
+      document.execCommand('bold');
+    }
+  </script>
+</body>
+</html>
