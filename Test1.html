@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dynamic Excel-like Grid</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    td, th {
+      border: 1px solid black;
+      padding: 8px;
+      min-width: 80px;
+      text-align: left;
+    }
+    .bold {
+      font-weight: bold;
+    }
+    .controls {
+      margin-bottom: 10px;
+    }
+    .merged {
+      text-align: center;  /* center text for merged cells */
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="addRow()">Add Row</button>
+    <button onclick="addColumn()">Add Column</button>
+    <button onclick="toggleBold()">Bold Cell</button>
+    <button onclick="mergeCells()">Merge</button>
+    <button onclick="splitCell()">Split</button>
+    <button onclick="makeHeader()">Make Header</button>
+    <button onclick="savePDF()">Save as PDF</button>
+  </div>
+
+  <table id="grid">
+    <tr>
+      <td contenteditable="true">Row 1 Col 1</td>
+      <td contenteditable="true">Row 1 Col 2</td>
+      <td contenteditable="true">Row 1 Col 3</td>
+    </tr>
+    <tr>
+      <td contenteditable="true">Row 2 Col 1</td>
+      <td contenteditable="true">Row 2 Col 2</td>
+      <td contenteditable="true">Row 2 Col 3</td>
+    </tr>
+  </table>
+
+<script>
+let selectedCell = null;
+
+// Select cell on click
+document.getElementById("grid").addEventListener("click", (e) => {
+  if (e.target.tagName === "TD" || e.target.tagName === "TH") {
+    if (selectedCell) selectedCell.style.backgroundColor = "";
+    selectedCell = e.target;
+    selectedCell.style.backgroundColor = "#d0e7ff";
+  }
+});
+
+// Add Row
+function addRow() {
+  let table = document.getElementById("grid");
+  let row = table.insertRow();
+  let cols = table.rows[0].cells.length;
+  for (let i = 0; i < cols; i++) {
+    let cell = row.insertCell();
+    cell.contentEditable = "true";
+    cell.innerText = `Row ${table.rows.length} Col ${i+1}`;
+  }
+}
+
+// Add Column
+function addColumn() {
+  let table = document.getElementById("grid");
+  for (let i = 0; i < table.rows.length; i++) {
+    let cell = table.rows[i].insertCell();
+    cell.contentEditable = "true";
+    cell.innerText = `Row ${i+1} Col ${table.rows[i].cells.length}`;
+  }
+}
+
+// Toggle Bold
+function toggleBold() {
+  if (selectedCell) {
+    selectedCell.classList.toggle("bold");
+  } else {
+    alert("Select a cell first!");
+  }
+}
+
+// Merge cells
+function mergeCells() {
+  if (!selectedCell) {
+    alert("Select a cell first!");
+    return;
+  }
+  let row = selectedCell.parentNode;
+  let startIndex = selectedCell.cellIndex;
+
+  if (startIndex < row.cells.length - 1) {
+    let nextCell = row.cells[startIndex + 1];
+    selectedCell.colSpan = (selectedCell.colSpan || 1) + (nextCell.colSpan || 1);
+    selectedCell.innerText += " " + nextCell.innerText;
+    row.deleteCell(startIndex + 1);
+    selectedCell.classList.add("merged");
+  }
+}
+
+// Split cells (new Excel-like logic)
+function splitCell() {
+  if (!selectedCell) {
+    alert("Select a cell first!");
+    return;
+  }
+  let row = selectedCell.parentNode;
+  let index = selectedCell.cellIndex;
+
+  // Split text into two parts (simple half split)
+  let text = selectedCell.innerText.trim();
+  let parts = text.split(" ");
+  let mid = Math.ceil(parts.length / 2);
+  let leftText = parts.slice(0, mid).join(" ");
+  let rightText = parts.slice(mid).join(" ");
+
+  selectedCell.colSpan = 1;
+  selectedCell.innerText = leftText;
+  let newCell = row.insertCell(index + 1);
+  newCell.contentEditable = "true";
+  newCell.innerText = rightText || " "; 
+}
+
+// Make first row header
+function makeHeader() {
+  let table = document.getElementById("grid");
+  let firstRow = table.rows[0];
+  for (let i = 0; i < firstRow.cells.length; i++) {
+    let oldCell = firstRow.cells[i];
+    let newCell = document.createElement("th");
+    newCell.innerHTML = oldCell.innerHTML;
+    newCell.contentEditable = "true";
+    firstRow.replaceChild(newCell, oldCell);
+  }
+}
+
+// Save to PDF
+function savePDF() {
+  const { jsPDF } = window.jspdf;
+  let table = document.getElementById("grid");
+
+  html2canvas(table).then(canvas => {
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF();
+    let imgWidth = 190;
+    let pageHeight = pdf.internal.pageSize.height;
+    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+
+    let position = 10;
+    pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+    pdf.save("grid.pdf");
+  });
+}
+</script>
+</body>
+</html>
