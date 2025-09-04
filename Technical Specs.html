@@ -52,6 +52,27 @@
 
     // Predefined text for column 1
     const col1Data = [
+      "Item",
+      "Application",
+      "Reitz Fan Model",
+      "Quantity",
+      "Arrangement",
+      "Impeller Type",
+      "DUTY PARAMETERS",
+      "Capacity at fan inlet",
+      "Static Pressure difference",
+      "Total Pressure",
+      "Temperature",
+      "Actual Density",
+      "Dust content",
+      "Fan speed",
+      "Fan shaft power (without / with dust)",
+      "Static efficiency (without / with dust)",
+      "Total efficiency  (without / with dust)",
+      "Minimum recommended capacity of motor",
+      "GD² of fan rotating parts ",
+      "Full load torque",
+      "Starting torque",  
       "CONSTRUCTIONAL FEATURES:",
       "IMPELLER",
       "Diameter",
@@ -71,7 +92,7 @@
         let cell = row.insertCell();
         if (j === 0) {
           // Add serial + predefined text
-          cell.textContent = (i + 1) + ". " + (col1Data[i] || "");
+          cell.textContent = (col1Data[i] || "");
         }
         cell.contentEditable = true;
         addResizer(cell);
