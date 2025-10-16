@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Technical Specifications of Fan</title>
+
+<style>
+  @page {
+    margin: 0;
+  }
+
+  body { 
+    font-family: Arial, sans-serif;
+    margin-left: 0; 
+  }
+
+  table {
+    border-collapse: collapse;
+    table-layout: auto;
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  td, th {
+    border: 0.5px solid black;
+    padding: 1px 3px; /* reduced padding for compact layout */
+    min-width: 120px;
+    margin-left: 0;
+    margin-right: 0;
+    vertical-align: middle;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .bold { font-weight: bold; }
+
+  .selected-col td, .selected-col th { background-color: #ffeb99; }
+  .no-print { display: block; }
+
+  @media print {
+    .no-print { display: none; }
+  }
+
+  /* Centered title */
+  #header-bar {
+    text-align: center;
+    margin-top: 3px;
+    /*margin-bottom: 3px; */
+  }
+
+  #header-bar h3 {
+    margin: 0;
+  }
+
+  /* Logo aligned right */
+  #logo-container {
+    display: flex;
+    justify-content: flex-end;
+    /*margin-bottom: 4px; */
+    margin-right: 15px;
+  }
+
+  #logo-container img {
+    width: 150px;
+    height: auto;
+  }
+
+  /* Proposal No. and Date row */
+  #proposal-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    margin: 0 15px 6px 15px;
+  }
+
+  #proposal-bar .left,
+  #proposal-bar .right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  #proposal-bar label {
+    font-weight: bold;
+  }
+
+  #proposal-bar input {
+    border: none;
+    background: none;
+    outline: none;
+    box-shadow: none;
+    width: 120px;
+    font-size: 14px;
+  }
+
+  #proposal-bar .right input {
+    text-align: right;
+  }
+
+  /* Prevent table splitting across pages */
+  table, tr, td, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #tableContainer {
+    position: relative;
+    overflow: auto;
+    border-collapse: collapse;
+    margin: 0;
+    padding: 0;
+    page-break-inside: avoid !important;
+  }
+
+/* --- TABLE COLUMN BEHAVIOR --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto; /* required to control widths and wrapping */
+  word-wrap: break-word;
+}
+
+th, td {
+  border: 1px solid #000;
+  padding: 2px 4px;
+  vertical-align: middle;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* --- Column 1: fixed width, no wrapping --- */
+table td:first-child,
+table th:first-child {
+  width: auto;              /* adjust as needed */
+  white-space: nowrap;
+  overflow: visible;
+  text-align: left;   /* shows “…” if content exceeds */
+}
+
+/* --- Columns 2 onward: auto-resize + wrap text --- */
+table td:not(:first-child),
+table th:not(:first-child) {
+  white-space: normal;       /* allows wrapping */
+  word-wrap: break-word;
+  
+}
+
+/* --- Keep table readable in PDF (A4 width) --- */
+@media print {
+  table {
+    width: 100%;
+    max-width: 100%
+}
+  th, td {
+    font-size: 12px;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<div id="header-bar">
+  <h3>Technical Specifications of Fan</h3>
+</div>
+
+<div id="logo-container">
+  <img src="https://raw.githubusercontent.com/Manogna379/enquiry-form/main/reitz_logo.jpg" alt="Company Logo" width="200">
+</div>
+
+<div id="proposal-bar">
+  <div class="left">
+    <label for="proposalNo">Proposal #:</label>
+    <input type="text" id="proposalNo" name="proposalNo" placeholder="Enter Proposal No.">
+  </div>
+  <div class="right">
+    <label for="proposalDate">Date:</label>
+    <input type="text" id="proposalDate" name="proposalDate" placeholder="Enter Date">
+  </div>
+</div>
+
+<div class="no-print" style="margin:10px">
+  <button onclick="addRow()">Add Row</button>
+  <button onclick="addColumn()">Add Column</button>
+  <button onclick="deleteColumn()">Delete Column</button>
+  <button onclick="mergeCells()">Merge</button>
+  <button onclick="splitCell()">Split</button>
+  <button onclick="toggleBold()">Bold</button>
+  <button onclick="downloadPDF()">Save as PDF</button>
+</div>
+
+<div id="tableContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+const tableContainer = document.getElementById("tableContainer");
+let table = document.createElement("table");
+tableContainer.appendChild(table);
+
+// Column 1 labels
+const col1Data = [
+  "Item","Application","Reitz Fan Model","Quantity","Arrangement","Impeller Type",
+  "<b>DUTY PARAMETERS</b>","Capacity at fan inlet","Static Pressure difference","Total Pressure",
+  "Temperature","Actual Density","Dust content","Fan speed","Fan shaft power (without / with dust)",
+  "Static efficiency (without / with dust)","Total efficiency (without / with dust)",
+  "Minimum recommended capacity of motor","GD² of fan rotating parts","Full load torque",
+  "Starting torque","<b>CONSTRUCTIONAL FEATURES:</b>",
+  "<b>1. IMPELLER</b>","Diameter","Centre plate","<i>Material</i>","<i>Thickness</i>",
+  "<i>Liners if any</i>","Shroud","<i>Material</i>","<i>Thickness</i>","Blade","<i>Material</i>",
+  "<i>Thickness</i>","<i>Liners if any</i>","Tip speed","Weight of Impeller","<b>2. SHAFT</b>",
+  "Material","Diameter at bearing","Critical speed","Shaft seal","Type","Material",
+  "<b>3. INLET CONE</b>","Material","Thickness","<b>4. CASING</b>","Material","Thickness",
+  "Liner if any","<b>5. INLET BOX</b>","Material","Thickness","Size","<b>6. INLET DAMPER</b>",
+  "Type","Size","<b>7. PEDESTAL</b>","Material","<b>8. BEARING</b>","Size","Make",
+  "<b>9. BEARING HOUSING</b>","Size","Lubrication","Make","<b>10. COUPLING</b>","Size",
+  "Make","<b>11. COOLING DISC</b>","<b>12. GUARDS</b>","13. Approx. weight of fan (without motor)",
+  "14. Normal density considered","15. Altitude considered"
+];
+
+// Build initial 3-column table
+for (let i = 0; i < col1Data.length; i++) {
+  let row = table.insertRow();
+  let cell1 = row.insertCell();
+  cell1.contentEditable = true;
+  cell1.innerHTML = col1Data[i];
+  cell1.style.maxWidth = "1500px";
+  cell1.style.verticalAlign = "top";
+  cell1.style.textAlign = "left";
+
+  for (let j = 0; j < 2; j++) {
+    let cell = row.insertCell();
+    cell.contentEditable = true;
+    cell.style.wordWrap = "break-word";
+    cell.style.overflowWrap = "break-word";
+    cell.style.whiteSpace = "normal";
+    cell.style.maxWidth = "150px";
+    cell.style.verticalAlign = "top";
+    cell.style.textAlign = "center";
+  }
+}
+
+// Formulas
+const formulas = {
+  "Static efficiency (without / with dust)": (values)=>{ let cap=(values["Capacity at fan inlet"]||0)/3600; let sp=values["Static Pressure difference"]||0; let power=values["Fan shaft power (without / with dust)"]||1; return Math.round((cap*sp)/power); },
+  "Total efficiency (without / with dust)": (values)=>{ let cap=(values["Capacity at fan inlet"]||0)/3600; let tp=values["Total Pressure"]||0; let power=values["Fan shaft power (without / with dust)"]||1; return Math.round((cap*tp)/power); },
+  "Full load torque": (values)=>{ let power=values["Fan shaft power (without / with dust)"]||0; let speed=values["Fan speed"]||1; return Math.round((power/speed)*974); },
+  "Starting torque": (values)=>{ let power=values["Fan shaft power (without / with dust)"]||0; let speed=values["Fan speed"]||1; return Math.round((power/speed)*974*0.145); },
+  "Tip speed": (values)=>{ let dia=(values["Diameter"]||0)/1000; let speed=(values["Fan speed"]||0)/60; return Math.round(3.14*dia*speed); }
+};
+
+function getValues(colIndex){
+  let values = {};
+  for(let i=0;i<table.rows.length;i++){
+    let label=table.rows[i].cells[0].innerText.trim();
+    let val=parseFloat(table.rows[i].cells[colIndex].innerText.trim());
+    if(!isNaN(val)) values[label]=val;
+  }
+  return values;
+}
+
+function updateFormulas(e){
+  let cell = e.target.closest("td");
+  if(!cell) return;
+  let colIndex = cell.cellIndex;
+  if(colIndex <=1) return;
+  let empty=true;
+  for(let i=0;i<table.rows.length;i++){ if(table.rows[i].cells[colIndex].innerText.trim()!==""){ empty=false; break; } }
+  if(empty) return;
+  let values=getValues(colIndex);
+  for(let i=0;i<table.rows.length;i++){
+    let label=table.rows[i].cells[0].innerText.trim();
+    if(formulas[label]){
+      table.rows[i].cells[colIndex].innerText=isNaN(formulas[label](values))?"":formulas[label](values);
+    }
+  }
+}
+table.addEventListener("input",updateFormulas);
+
+// Column selection for delete
+let selectedColIndex = null;
+table.addEventListener("click",(e)=>{
+  const cell = e.target.closest("td");
+  if(!cell) return;
+  selectedColIndex = cell.cellIndex;
+  for(let r=0;r<table.rows.length;r++){
+    for(let c=0;c<table.rows[r].cells.length;c++){
+      table.rows[r].cells[c].classList.remove("selected-col");
+    }
+  }
+  for(let r=0;r<table.rows.length;r++){
+    if(table.rows[r].cells[selectedColIndex]) table.rows[r].cells[selectedColIndex].classList.add("selected-col");
+  }
+});
+
+// Row/Column functions
+function addRow(){
+  let row=table.insertRow();
+  for(let j=0;j<table.rows[0].cells.length;j++){
+    let cell=row.insertCell();
+    cell.contentEditable=true;
+    if(j===0) cell.innerHTML="New Row";
+  }
+}
+function addColumn(){
+  for(let i=0;i<table.rows.length;i++){
+    let cell=table.rows[i].insertCell();
+    cell.contentEditable=true;
+    cell.style.wordWrap = "break-word";
+    cell.style.overflowWrap = "break-word";
+    cell.style.whiteSpace = "normal";
+    cell.style.maxWidth = "150px";
+    cell.style.verticalAlign = "top";
+    cell.style.textAlign = "center";
+  }
+}
+function deleteColumn(){
+  if(selectedColIndex===null || selectedColIndex===0) return;
+  for(let r=0;r<table.rows.length;r++){
+    table.rows[r].deleteCell(selectedColIndex);
+  }
+  selectedColIndex=null;
+}
+
+// Merge/Split
+function mergeCells(){
+  let selection=window.getSelection();
+  if(!selection.rangeCount) return;
+  let range=selection.getRangeAt(0);
+  let startCell=range.startContainer.closest("td");
+  let endCell=range.endContainer.closest("td");
+  if(!startCell||!endCell||startCell===endCell) return;
+  let startRow=startCell.parentNode.rowIndex;
+  let startCol=startCell.cellIndex;
+  let endRow=endCell.parentNode.rowIndex;
+  let endCol=endCell.cellIndex;
+  for(let r=startRow;r<=endRow;r++){
+    for(let c=startCol;c<=endCol;c++){
+      if(r===startRow && c===startCol){
+        table.rows[r].cells[c].rowSpan=endRow-startRow+1;
+        table.rows[r].cells[c].colSpan=endCol-startCol+1;
+        table.rows[r].cells[c].style.textAlign="center";
+        table.rows[r].cells[c].style.verticalAlign="middle";
+      } else {
+        table.rows[r].deleteCell(startCol);
+      }
+    }
+  }
+}
+
+function splitCell(){
+  let selection=window.getSelection();
+  if(!selection.rangeCount) return;
+  let cell=selection.getRangeAt(0).startContainer.closest("td");
+  if(!cell||(cell.colSpan===1 && cell.rowSpan===1)) return;
+  let rowIndex=cell.parentNode.rowIndex;
+  let colIndex=cell.cellIndex;
+  let rowSpan=cell.rowSpan;
+  let colSpan=cell.colSpan;
+  cell.rowSpan=1;
+  cell.colSpan=1;
+  for(let r=rowIndex;r<rowIndex+rowSpan;r++){
+    for(let c=colIndex;c<colIndex+colSpan;c++){
+      if(r===rowIndex && c===colIndex) continue;
+      let newCell=table.rows[r].insertCell(c);
+      newCell.contentEditable=true;
+    }
+  }
+}
+
+function toggleBold(){ document.execCommand("bold",false,null); }
+
+// PDF Export
+function hideEmptyColumns(){
+  let totalCols = table.rows[0].cells.length;
+  for(let c=totalCols-1;c>0;c--){
+    let empty=true;
+    for(let r=0;r<table.rows.length;r++){
+      if(table.rows[r].cells[c] && table.rows[r].cells[c].innerText.trim()!==""){ empty=false; break; }
+    }
+    if(empty){
+      for(let r=0;r<table.rows.length;r++){
+        if(table.rows[r].cells[c]) table.rows[r].cells[c].style.display="none";
+      }
+    }
+  }
+}
+function showAllColumns(){
+  for(let r=0;r<table.rows.length;r++){
+    for(let c=0;c<table.rows[r].cells.length;c++){
+      table.rows[r].cells[c].style.display="";
+    }
+  }
+}
+
+function downloadPDF(){
+  hideEmptyColumns();
+  const buttons=document.querySelectorAll(".no-print");
+  buttons.forEach(btn=>btn.style.display="none");
+
+  const columnCount = table.rows[0]?.cells.length || 0;
+  const orientation = columnCount > 4 ? "landscape" : "portrait";
+
+  let userInput = prompt("Enter a name to append to the PDF filename:", "Report");
+  if (!userInput || userInput.trim() === "") userInput = "table";
+  userInput = userInput.replace(/[\\:*?\"<>|]/g, "_");
+  const filename = `Proposal_${userInput}.pdf`;
+
+  const opt = {
+    margin: 0.5,
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'a4', orientation: orientation }
+  };
+
+  html2pdf().set(opt).from(document.getElementById("tableContainer").parentNode).save().then(()=>{
+    buttons.forEach(btn=>btn.style.display="block");
+    showAllColumns();
+  });
+}
+</script>
+</body>
+</html>
