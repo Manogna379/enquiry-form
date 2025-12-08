@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Technical Specifications of Fan</title>
+<style>
+  body { font-family: Arial, sans-serif; }
+  table {
+    border-collapse: collapse;
+    table-layout: auto;
+    width: auto;
+    max-width: 100%;
+  }
+  td, th {
+    border: 1px solid black;
+    padding: 4px;
+    min-width: 120px;
+    vertical-align: middle;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .bold { font-weight: bold; }
+
+  #logo-container { position: absolute; top: 10px; right: 10px; text-align: right; }
+  #logo-container img { width: 80px; height: 100px; }
+
+  td.selected-col, th.selected-col { background-color: #ffeb99; }
+
+  .no-print { display: block; margin-bottom: 5px; }
+
+  @media print {
+    .no-print { display: none; }
+  }
+
+  #header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  #header-bar img {
+    width: 100px;
+    height: 150px;
+    object-fit: scale-down;
+  }
+
+  table tr, table td, table th {
+    vertical-align: center;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  td.selecting, th.selecting {
+    background-color: #d9eaff;  /* light blue while dragging */
+  }
+
+  td.selected-rect, th.selected-rect {
+    background-color: #b3d4ff;  /* darker blue for final selection */
+  }
+</style>
+</head>
+<body>
+
+<div id="header-bar">
+  <h2>Technical Specifications of Fan</h2>
+  <img src="https://raw.githubusercontent.com/Manogna379/enquiry-form/main/reitz_logo.jpg"
+       alt="Company Logo" width="200">
+</div>
+
+<div class="no-print">
+  <button onclick="addRow()">Add Row</button>
+  <button onclick="addColumn()">Add Column</button>
+  <button onclick="deleteColumn()">Delete Column</button>
+  <button onclick="deleteRow()">Delete Row</button>
+  <button onclick="mergeCells()">Merge</button>
+  <button onclick="splitCell()">Split</button>
+  <button onclick="toggleBold()">Bold</button>
+  <button onclick="downloadPDF()">Save as PDF</button>
+  <button onclick="copyColumnButton()">Copy Column</button>
+  <button onclick="pasteColumn()">Paste Column</button>
+  <button onclick="copyRows()">Copy Row(s)</button>
+  <button onclick="pasteRows()">Paste Row(s)</button>
+</div>
+
+<div id="tableContainer" style="position:relative; overflow:auto;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+/* ------------------- TABLE CREATION ------------------- */
+
+const tableContainer = document.getElementById("tableContainer");
+let table = document.createElement("table");
+tableContainer.appendChild(table);
+
+const col1Data = [
+  "Item","Application","Reitz Fan Model","Quantity","Arrangement","Impeller Type",
+  "<b>DUTY PARAMETERS</b>","Capacity at fan inlet","Static Pressure difference","Total Pressure",
+  "Temperature","Actual Density","Dust content","Fan speed","Fan shaft power (without / with dust)",
+  "Static efficiency (without / with dust)","Total efficiency (without / with dust)",
+  "Minimum recommended capacity of motor","GD² of fan rotating parts","Full load torque",
+  "Starting torque","<b>CONSTRUCTIONAL FEATURES:</b>",
+  "<b>1. IMPELLER</b>","Diameter","Centre plate","<i>Material</i>","<i>Thickness</i>",
+  "<i>Liners if any</i>","Shroud","<i>Material</i>","<i>Thickness</i>","Blade","<i>Material</i>",
+  "<i>Thickness</i>","<i>Liners if any</i>","Tip speed","Weight of Impeller","<b>2. SHAFT</b>",
+  "Material","Diameter at bearing","Critical speed","Shaft seal","Type","Material",
+  "<b>3. INLET CONE</b>","Material","Thickness","<b>4. CASING</b>","Material","Thickness",
+  "Liner if any","<b>5. INLET BOX</b>","Material","Thickness","Size","<b>6. INLET DAMPER</b>",
+  "Type","Size","<b>7. PEDESTAL</b>","Material","<b>8. BEARING</b>","Size","Make",
+  "<b>9. BEARING HOUSING</b>","Size","Lubrication","Make","<b>10. COUPLING</b>","Size",
+  "Make","<b>11. COOLING DISC</b>","<b>12. GUARDS</b>","13. Approx. weight of fan (without motor)",
+  "14. Normal density considered","15. Altitude considered"
+];
+
+// Build initial 3-column table (labels + 2 data columns)
+for (let i = 0; i < col1Data.length; i++) {
+  const row = table.insertRow();
+  for (let j = 0; j < 3; j++) {
+    const cell = row.insertCell();
+    cell.contentEditable = true;
+    if (j === 0) cell.innerHTML = col1Data[i];
+  }
+}
+
+/* ------------------- FORMULA ENGINE ------------------- */
+
+const formulas = {
+  "Static efficiency (without / with dust)": (values) => {
+    const divisor = values.__capTimeDivisor || 3600;   // default if missing
+    const cap   = (values["Capacity at fan inlet"] || 0) / divisor;
+    const sp    = values["Static Pressure difference"] || 0;
+    const power = values["Fan shaft power (without / with dust)"] || 0;
+    const result = (((cap * sp) / (102 * power)) * 100);
+    return isFinite(result) ? Math.round(result) : "";
+  },
+
+  "Total efficiency (without / with dust)": (values) => {
+    const divisor = values.__capTimeDivisor || 3600;
+    const cap   = (values["Capacity at fan inlet"] || 0) / divisor;
+    const tp    = values["Total Pressure"] || 0;
+    const power = values["Fan shaft power (without / with dust)"] || 0;
+    const result = (((cap * tp) / (102 * power)) * 100);
+    return isFinite(result) ? Math.round(result) : "";
+  },
+  "Full load torque": (values) => {
+    const power = values["Fan shaft power (without / with dust)"] || 0;
+    const speed = values["Fan speed"] || 0;
+    const result = (speed === 0) ? NaN : (power / speed) * 974;
+    return isFinite(result) ? Math.round(result) : "";
+  },
+
+  "Starting torque": (values) => {
+    const power = values["Fan shaft power (without / with dust)"] || 0;
+    const speed = values["Fan speed"] || 0;
+    const result = (speed === 0) ? NaN : (power / speed) * 974 * 0.145;
+    return isFinite(result) ? Math.round(result) : "";
+  },
+
+  "Tip speed": (values) => {
+    const dia   = values["Diameter"] || 0;    // mm
+    const speed = values["Fan speed"] || 0;   // rpm
+    const result = Math.PI * (dia / 1000) * (speed / 60);
+    return isFinite(result) ? Math.round(result) : "";
+  },
+
+  "Critical speed": (values) => {
+    const speed = values["Fan speed"] || 0;
+    const result = speed * 1.5;
+    return isFinite(result) ? Math.round(result) : "";
+  }
+};
+
+function normalizeLabel(text) {
+  text = (text || "").replace(/\s+/g, " ").trim();
+
+  if (text.startsWith("Static efficiency"))
+    return "Static efficiency (without / with dust)";
+  if (text.startsWith("Total efficiency"))
+    return "Total efficiency (without / with dust)";
+  if (text.startsWith("Fan shaft power"))
+    return "Fan shaft power (without / with dust)";
+  if (text.startsWith("Capacity at fan inlet"))
+    return "Capacity at fan inlet";
+  if (text.startsWith("Static Pressure difference"))
+    return "Static Pressure difference";
+  if (text.startsWith("Total Pressure"))
+    return "Total Pressure";
+  if (text.startsWith("Fan speed"))
+    return "Fan speed";
+  if (text.startsWith("Diameter"))
+    return "Diameter";
+  if (text.startsWith("Critical speed"))
+    return "Critical speed";
+
+  return text;
+}
+
+// Convert a pressure value from whatever units are in the units-cell (col 2)
+// into our internal "base" units (mmWC).
+function pressureToMmwc(value, unitText) {
+  if (isNaN(value)) return NaN;
+  if (!unitText) return value;
+
+  unitText = String(unitText).toLowerCase();
+
+  // normalise some common spellings
+  unitText = unitText.replace(/\s+/g, "");
+  unitText = unitText.replace("mmh2o", "mmwc");
+  unitText = unitText.replace("mmw.c", "mmwc");
+
+  // base unit: mmWC
+  if (unitText.includes("mmwc") || unitText.includes("mmwg")) {
+    return value;                  // already mmWC
+  }
+
+  if (unitText.includes("kpa")) {
+    // 1 kPa ≈ 101.97 mmWC
+    return value * 101.97;
+  }
+
+  if (unitText.includes("pa")) {
+    // 1 mmWC ≈ 9.80665 Pa  →  Pa to mmWC
+    return value / 9.80665;
+  }
+
+  // fallback: if we don't recognise the unit, just use the number as mmWC
+  return value;
+}
+
+
+// Get numeric values for one visual column (Design / Operating / etc.)
+/*function getValues(vIndex) {
+  const values = {};
+
+  // Default: your existing assumption (m³/hr → divide by 3600)
+  let capTimeDivisor = 3600;
+
+  for (let i = 0; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    const labelCell = row.cells[0];
+    if (!labelCell) continue;
+
+    const dataCell = getCellByVisualIndex(row, vIndex);
+    if (!dataCell) continue;
+
+    const key = normalizeLabel(labelCell.innerText);
+
+    // --- Detect units for "Capacity at fan inlet" from column 2 (units column) ---
+    if (key === "Capacity at fan inlet") {
+      const unitCell = row.cells[1]; // second column = units
+      if (unitCell) {
+        let unitText = (unitCell.innerText || unitCell.textContent || "").toLowerCase();
+
+        // normalise superscript ³ just in case
+        unitText = unitText.replace(/³/g, "3");
+
+        // If it contains "sec" → treat as m3/sec → divisor = 1
+        if (unitText.includes("sec")) {
+          capTimeDivisor = 1;
+        }
+        // If it contains "hr" or "hour" → m3/hr → divisor = 3600
+        else if (unitText.includes("hr") || unitText.includes("hour")) {
+          capTimeDivisor = 3600;
+        }
+        // otherwise leave default, or set something else if you want
+      }
+    }
+
+    // --- collect numeric values as before ---
+    let raw = dataCell.innerText.trim();
+    raw = raw.replace(/,/g, ""); // remove thousand separators
+    const val = parseFloat(raw);
+    if (!isNaN(val)) values[key] = val;
+  }
+
+  // store the divisor so formulas can use it
+  values.__capTimeDivisor = capTimeDivisor;
+  return values;
+} */
+
+// Get numeric values for one visual column (Design / Operating / etc.)
+// and normalise units (capacity time & pressure units)
+function getValues(vIndex) {
+  const values = {};
+
+  // default assumption: capacity is in m³/hr → divide by 3600
+  let capTimeDivisor = 3600;
+
+  for (let i = 0; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    const labelCell = row.cells[0];
+    if (!labelCell) continue;
+
+    const dataCell = getCellByVisualIndex(row, vIndex);
+    if (!dataCell) continue;
+
+    const key = normalizeLabel(labelCell.innerText);
+
+    let raw = dataCell.innerText.trim();
+    raw = raw.replace(/,/g, "");
+    const numeric = parseFloat(raw);
+    if (isNaN(numeric)) continue;
+
+    // column 2 is the "units" column for all these rows
+    const unitCell = row.cells[1];
+    const unitText = unitCell
+      ? (unitCell.innerText || unitCell.textContent || "")
+      : "";
+
+    if (key === "Capacity at fan inlet") {
+      // capacity units: m3/hr or m3/sec
+      let u = unitText.toLowerCase().replace(/³/g, "3");
+
+      if (u.includes("sec")) {
+        capTimeDivisor = 1;      // m3/sec → no division
+      } else if (u.includes("hr") || u.includes("hour")) {
+        capTimeDivisor = 3600;   // m3/hr → divide by 3600
+      }
+
+      values[key] = numeric;  // raw value; divisor applied later in formula
+    }
+    else if (key === "Static Pressure difference" ||
+             key === "Total Pressure") {
+      // convert pressure to mmWC internally
+      const mmwcVal = pressureToMmwc(numeric, unitText);
+      values[key] = mmwcVal;
+    }
+    else {
+      // all other numeric fields
+      values[key] = numeric;
+    }
+  }
+
+  // save divisor for capacity usage in formulas
+  values.__capTimeDivisor = capTimeDivisor;
+  return values;
+}
+
+function updateFormulas(e) {
+  const cell = e.target.closest("td,th");
+  if (!cell || !table.contains(cell)) return;
+
+  const vIndex = getVisualColIndex(cell);
+
+  if (vIndex <= 1) return; // labels/units
+
+  let empty = true;
+  for (let i = 0; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    const colCell = getCellByVisualIndex(row, vIndex);
+    if (colCell && colCell.innerText.trim() !== "") {
+      empty = false;
+      break;
+    }
+  }
+  if (empty) return;
+
+  const values = getValues(vIndex);
+
+  for (let i = 0; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    const labelCell  = row.cells[0];
+    const targetCell = getCellByVisualIndex(row, vIndex);
+    if (!labelCell || !targetCell) continue;
+
+    const key = normalizeLabel(labelCell.innerText);
+    const fn  = formulas[key];
+    if (!fn) continue;
+
+    // 🔴 SPECIAL RULE: do NOT calculate torque in OPERATING rows/columns
+    if (key === "Full load torque" || key === "Starting torque") {
+      const rowMode = getRowMode(i);          // design / operating / null
+      const colMode = getColumnMode(vIndex);  // design / operating / null
+      const mode    = rowMode || colMode;     // row takes priority, then column
+
+      if (mode === "operating") {
+        // skip calculation → leave whatever value user typed
+        continue;
+      }
+    }
+
+    const computed = fn(values);
+    if (
+      computed === "" ||
+      computed === null ||
+      typeof computed === "undefined" ||
+      !isFinite(computed)
+    ) {
+      targetCell.innerText = "";
+    } else {
+      targetCell.innerText = computed;
+    }
+  }
+}
+
+table.addEventListener("input", updateFormulas);
+
+/* ------------------- VISUAL COLUMN HELPERS ------------------- */
+
+// Return "design", "operating" or null from a cell's text
+function detectModeFromText(text) {
+  if (!text) return null;
+  text = String(text).toLowerCase();
+  if (text.includes("design"))    return "design";
+  if (text.includes("operating")) return "operating";
+  return null;
+}
+
+function getColumnMode(vIndex) {
+  for (let r = 0; r < table.rows.length; r++) {
+    const row  = table.rows[r];
+    const cell = getCellByVisualIndex(row, vIndex);
+    if (!cell) continue;
+    const mode = detectModeFromText(cell.innerText || cell.textContent);
+    if (mode) return mode;       // first match wins
+  }
+  return null;
+}
+
+function getRowMode(rowIndex) {
+  const row = table.rows[rowIndex];
+  if (!row) return null;
+
+  for (let c = 0; c < row.cells.length; c++) {
+    const cell = row.cells[c];
+    const mode = detectModeFromText(cell.innerText || cell.textContent);
+    if (mode) return mode;
+  }
+  return null;
+}
+
+function getVisualColIndex(cell) {
+  const row = cell.parentNode;
+  let vCol = 0;
+  for (let i = 0; i < row.cells.length; i++) {
+    const c = row.cells[i];
+    const span = c.colSpan || 1;
+    if (c === cell) return vCol;
+    vCol += span;
+  }
+  return -1;
+}
+
+// maximum number of visual columns across all rows
+function getTotalVisualColumns() {
+  let maxCols = 0;
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    let total = 0;
+    for (let c = 0; c < row.cells.length; c++) {
+      total += row.cells[c].colSpan || 1;
+    }
+    if (total > maxCols) maxCols = total;
+  }
+  return maxCols;
+}
+
+function getCellByVisualIndex(row, vIndex) {
+  let running = 0;
+  for (let c = 0; c < row.cells.length; c++) {
+    const cell = row.cells[c];
+    const span = cell.colSpan || 1;
+    if (vIndex >= running && vIndex < running + span) return cell;
+    running += span;
+  }
+  return null;
+}
+
+function getCell(node) {
+  if (!node) return null;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+  while (node && node.nodeType === Node.ELEMENT_NODE &&
+         !/^(TD|TH)$/.test(node.tagName)) {
+    node = node.parentNode;
+  }
+  return (node && /^(TD|TH)$/.test(node.tagName)) ? node : null;
+}
+
+/* ------------------- ROW / COLUMN OPS ------------------- */
+
+let selectedColIndex = null;     // visual index for yellow highlight
+let copiedColumnData = null;
+let copiedRowsData   = null;
+
+// Add row: above current selection, or at end if nothing selected
+function addRow() {
+  const rect = getSelectedRect();
+  const insertIndex = rect ? rect.r1 : table.rows.length;
+  const totalVisualCols = getTotalVisualColumns();
+
+  const newRow = table.insertRow(insertIndex);
+  for (let v = 0; v < totalVisualCols; v++) {
+    const cell = newRow.insertCell(-1);
+    cell.contentEditable = true;
+  }
+  if (newRow.cells[0]) {
+    newRow.cells[0].innerHTML = "New Row";
+  }
+}
+
+// always append a column at far right
+function addColumn() {
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    const newCell = row.insertCell(-1);
+    newCell.contentEditable = true;
+  }
+}
+
+function deleteColumn() {
+  if (selectedColIndex === null || selectedColIndex === 0) return; // don't delete labels
+
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    let vCol = 0;
+    for (let c = 0; c < row.cells.length; c++) {
+      const cell = row.cells[c];
+      const span = cell.colSpan || 1;
+      if (selectedColIndex >= vCol && selectedColIndex < vCol + span) {
+        if (span > 1) {
+          cell.colSpan = span - 1;
+        } else {
+          row.deleteCell(c);
+        }
+        break;
+      }
+      vCol += span;
+    }
+  }
+  selectedColIndex = null;
+}
+
+// delete row(s) based on rectangle selection
+function deleteRow() {
+  const rect = getSelectedRect();
+  if (!rect) {
+    alert("Select a cell in the row(s) you want to delete, then click Delete Row.");
+    return;
+  }
+  const { r1, r2 } = rect;
+
+  // safety: no merged cells inside rows or spanning from above
+  for (let r = r1; r <= r2; r++) {
+    const row = table.rows[r];
+    if (!row) continue;
+    for (let c = 0; c < row.cells.length; c++) {
+      const cell = row.cells[c];
+      if ((cell.rowSpan || 1) > 1) {
+        alert("Cannot delete a row that contains a merged cell. Please split the cell(s) first.");
+        return;
+      }
+    }
+  }
+  for (let r = 0; r < r1; r++) {
+    const row = table.rows[r];
+    if (!row) continue;
+    for (let c = 0; c < row.cells.length; c++) {
+      const cell = row.cells[c];
+      const rs = cell.rowSpan || 1;
+      if (rs > 1) {
+        const startRow = r;
+        const endRow = r + rs - 1;
+        if (endRow >= r1 && startRow < r1) {
+          alert("Some of the selected rows are part of a merged cell above. Please split that cell first.");
+          return;
+        }
+      }
+    }
+  }
+  for (let r = r2; r >= r1; r--) {
+    table.deleteRow(r);
+  }
+  clearCellSelectionHighlights();
+}
+
+/* ------------------- COLUMN HIGHLIGHT (YELLOW) ------------------- */
+
+table.addEventListener("click", (e) => {
+  const cell = e.target.closest("td,th");
+  if (!cell) return;
+
+  selectedColIndex = getVisualColIndex(cell);
+
+  for (let r = 0; r < table.rows.length; r++) {
+    for (let c = 0; c < table.rows[r].cells.length; c++) {
+      table.rows[r].cells[c].classList.remove("selected-col");
+    }
+  }
+
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    let vCol = 0;
+    for (let c = 0; c < row.cells.length; c++) {
+      const cell2 = row.cells[c];
+      const span = cell2.colSpan || 1;
+      if (selectedColIndex >= vCol && selectedColIndex < vCol + span) {
+        cell2.classList.add("selected-col");
+        break;
+      }
+      vCol += span;
+    }
+  }
+});
+
+/* ------------------- SELECTION RECTANGLE ------------------- */
+
+let lastRange = null;
+document.addEventListener("selectionchange", () => {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) lastRange = sel.getRangeAt(0).cloneRange();
+});
+
+function getActiveRange() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) return sel.getRangeAt(0);
+  if (lastRange) return lastRange.cloneRange();
+  return null;
+}
+
+let isSelecting = false;
+let selStartCell = null;
+let selEndCell = null;
+
+function clearCellSelectionHighlights() {
+  const tds = table.querySelectorAll("td,th");
+  tds.forEach(td => {
+    td.classList.remove("selecting");
+    td.classList.remove("selected-rect");
+  });
+  selStartCell = selEndCell = null;
+}
+
+function cellCoords(td) {
+  return { row: td.parentNode.rowIndex, col: td.cellIndex };
+}
+
+function highlightRect(startTd, currentTd) {
+  const tds = table.querySelectorAll("td,th");
+  tds.forEach(td => td.classList.remove("selecting"));
+  if (!startTd || !currentTd) return;
+
+  const a = cellCoords(startTd);
+  const b = cellCoords(currentTd);
+  const r1 = Math.min(a.row, b.row), r2 = Math.max(a.row, b.row);
+  const c1 = Math.min(a.col, b.col), c2 = Math.max(a.col, b.col);
+
+  for (let r = r1; r <= r2; r++) {
+    if (!table.rows[r]) continue;
+    for (let c = c1; c <= c2; c++) {
+      const cell = table.rows[r].cells[c];
+      if (cell) cell.classList.add("selecting");
+    }
+  }
+}
+
+function finalizeSelection(startTd, endTd) {
+  const tds = table.querySelectorAll("td,th");
+  tds.forEach(td => {
+    td.classList.remove("selecting");
+    td.classList.remove("selected-rect");
+  });
+
+  const a = cellCoords(startTd);
+  const b = cellCoords(endTd);
+  const r1 = Math.min(a.row, b.row), r2 = Math.max(a.row, b.row);
+  const c1 = Math.min(a.col, b.col), c2 = Math.max(a.col, b.col);
+
+  for (let r = r1; r <= r2; r++) {
+    if (!table.rows[r]) continue;
+    for (let c = c1; c <= c2; c++) {
+      const cell = table.rows[r].cells[c];
+      if (cell) cell.classList.add("selected-rect");
+    }
+  }
+  selStartCell = startTd;
+  selEndCell = endTd;
+}
+
+function getSelectedRect() {
+  if (!selStartCell || !selEndCell) return null;
+  const a = cellCoords(selStartCell);
+  const b = cellCoords(selEndCell);
+  return {
+    r1: Math.min(a.row, b.row),
+    r2: Math.max(a.row, b.row),
+    c1: Math.min(a.col, b.col),
+    c2: Math.max(a.col, b.col)
+  };
+}
+
+table.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  const td = e.target.closest("td,th");
+  if (!td || !table.contains(td)) return;
+  isSelecting = true;
+  selStartCell = td;
+  selEndCell = td;
+  highlightRect(selStartCell, selEndCell);
+  e.preventDefault();
+});
+
+table.addEventListener("mouseover", (e) => {
+  if (!isSelecting) return;
+  const td = e.target.closest("td,th");
+  if (!td || !table.contains(td)) return;
+  selEndCell = td;
+  highlightRect(selStartCell, selEndCell);
+});
+
+document.addEventListener("mouseup", (e) => {
+  if (!isSelecting) return;
+  isSelecting = false;
+  const td = e.target.closest("td,th");
+  if (td && table.contains(td)) selEndCell = td;
+  if (selStartCell && selEndCell) finalizeSelection(selStartCell, selEndCell);
+});
+
+table.addEventListener("dblclick", (e) => {
+  const td = e.target.closest("td,th");
+  if (td && table.contains(td)) {
+    clearCellSelectionHighlights();
+    td.focus();
+    const range = document.createRange();
+    range.selectNodeContents(td);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+});
+
+// single-click to select one cell as rectangle
+table.addEventListener("click", (e) => {
+  const td = e.target.closest("td,th");
+  if (!td || !table.contains(td)) return;
+
+  if (selStartCell && selEndCell && (selStartCell !== selEndCell)) return;
+
+  clearCellSelectionHighlights();
+  td.classList.add("selected-rect");
+  selStartCell = selEndCell = td;
+});
+
+/* ------------------- COPY / PASTE: COLUMNS ------------------- */
+
+// Button: always copy whole column (and put into system clipboard)
+function copyColumnButton() {
+  if (selectedColIndex === null || selectedColIndex === 0) {
+    alert("Select a data column (not the first label column) to copy.");
+    return;
+  }
+  copyColumnByIndex(selectedColIndex);
+  alert("Column copied!");
+}
+
+function copyColumnByIndex(vIndex) {
+  copiedColumnData = [];
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    const cell = getCellByVisualIndex(row, vIndex);
+    copiedColumnData.push(cell ? cell.innerText : "");
+  }
+
+  const text = copiedColumnData.join("\n");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+}
+
+// Paste column: try clipboard, else fallback to local copy
+async function pasteColumn() {
+  let rowsText = null;
+
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      rowsText = text.split(/\r?\n/);
+    } catch (e) {
+      // ignore if user denied or browser blocks
+    }
+  }
+
+  if (!rowsText && copiedColumnData) {
+    rowsText = copiedColumnData.slice();
+  }
+
+  if (!rowsText) {
+    alert("No column data available to paste.");
+    return;
+  }
+
+  // decide where to paste
+  let targetVisualIndex;
+  if (selectedColIndex !== null && selectedColIndex > 0) {
+    targetVisualIndex = selectedColIndex;
+  } else {
+    // create a new column at far right
+    addColumn();
+    targetVisualIndex = getTotalVisualColumns() - 1;
+  }
+
+  for (let r = 0; r < table.rows.length; r++) {
+    const row = table.rows[r];
+    const cell = getCellByVisualIndex(row, targetVisualIndex);
+    if (cell) {
+      cell.innerText = rowsText[r] || "";
+    }
+  }
+}
+
+/* ------------------- COPY / PASTE: ROWS ------------------- */
+
+function copyRows() {
+  const rect = getSelectedRect();
+  if (!rect) {
+    alert("Drag to select one or more rows, then click Copy Row(s).");
+    return;
+  }
+
+  const { r1, r2 } = rect;
+  const totalVisualCols = getTotalVisualColumns();
+  copiedRowsData = [];
+
+  for (let r = r1; r <= r2; r++) {
+    const rowData = [];
+    for (let v = 0; v < totalVisualCols; v++) {
+      const cell = getCellByVisualIndex(table.rows[r], v);
+      rowData.push(cell ? cell.innerHTML : "");
+    }
+    copiedRowsData.push(rowData);
+  }
+
+  alert("Row(s) copied!");
+}
+
+function pasteRows() {
+  if (!copiedRowsData || !copiedRowsData.length) {
+    alert("No rows copied yet.");
+    return;
+  }
+
+  const rect = getSelectedRect();
+  // insert below current selection, or at end
+  let insertIndex = rect ? rect.r2 + 1 : table.rows.length;
+  const totalVisualCols = getTotalVisualColumns();
+
+  for (const rowData of copiedRowsData) {
+    const newRow = table.insertRow(insertIndex++);
+    for (let v = 0; v < totalVisualCols; v++) {
+      const cell = newRow.insertCell(-1);
+      cell.contentEditable = true;
+      cell.innerHTML = rowData[v] || "";
+    }
+  }
+}
+
+/* ------------------- KEYBOARD SHORTCUTS ------------------- */
+
+document.addEventListener("keydown", (e) => {
+  // ESC → clear selection
+  if (e.key === "Escape") {
+    clearCellSelectionHighlights();
+    return;
+  }
+
+  // Ctrl+M / Cmd+M → merge
+  if ((e.key === "m" || e.key === "M") && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    mergeCells();
+  }
+
+  // NOTE:
+  // We DO NOT intercept Ctrl+C / Ctrl+V at all.
+  // Normal browser copy & paste works like usual,
+  // so you can paste from Excel or other pages into any cell.
+});
+
+/* ------------------- MERGE / SPLIT ------------------- */
+
+function mergeCells() {
+  const rect = getSelectedRect() || (() => {
+    const range = getActiveRange();
+    if (!range) return null;
+    const startCell = getCell(range.startContainer);
+    const endCell   = getCell(range.endContainer);
+    if (!startCell || !endCell) return null;
+    return {
+      r1: Math.min(startCell.parentNode.rowIndex, endCell.parentNode.rowIndex),
+      r2: Math.max(startCell.parentNode.rowIndex, endCell.parentNode.rowIndex),
+      c1: Math.min(startCell.cellIndex,       endCell.cellIndex),
+      c2: Math.max(startCell.cellIndex,       endCell.cellIndex)
+    };
+  })();
+
+  if (!rect) {
+    alert("Select cells by dragging the mouse across them (or click a cell then drag).");
+    return;
+  }
+
+  let { r1, r2, c1, c2 } = rect;
+  if (r1 === r2 && c1 === c2) {
+    alert("Select multiple cells to merge.");
+    return;
+  }
+
+  const topLeft = table.rows[r1].cells[c1];
+  if (!topLeft) {
+    alert("Top-left cell missing — check table structure.");
+    return;
+  }
+
+  for (let r = r1; r <= r2; r++) {
+    const row = table.rows[r];
+    if (!row) continue;
+    for (let c = c2; c >= c1; c--) {
+      const cell = row.cells[c];
+      if (!cell) continue;
+      if (r === r1 && c === c1) continue;
+      row.deleteCell(c);
+    }
+  }
+
+  topLeft.rowSpan = r2 - r1 + 1;
+  topLeft.colSpan = c2 - c1 + 1;
+  topLeft.style.textAlign = "center";
+  topLeft.style.verticalAlign = "middle";
+
+  clearCellSelectionHighlights();
+}
+
+// helper to split content text into 2 parts
+function splitTextInTwo(text) {
+  text = (text || "").trim();
+  if (!text) return ["", ""];
+
+  const seps = ["|","/","\n",",",";"];
+  for (const sep of seps) {
+    const idx = text.indexOf(sep);
+    if (idx > 0) return [text.slice(0, idx).trim(), text.slice(idx + 1).trim()];
+  }
+  const mid = Math.floor(text.length / 2);
+  let leftIdx = text.lastIndexOf(" ", mid);
+  if (leftIdx <= 0) leftIdx = text.indexOf(" ", mid);
+  if (leftIdx > 0)
+    return [text.slice(0, leftIdx).trim(), text.slice(leftIdx + 1).trim()];
+  return [text, ""];
+}
+
+function splitCell() {
+  const rect = getSelectedRect();
+  let cell;
+  if (rect) {
+    const { r1, c1 } = rect;
+    if (!table.rows[r1] || !table.rows[r1].cells[c1]) {
+      alert("Selected top-left cell missing.");
+      return;
+    }
+    cell = table.rows[r1].cells[c1];
+  } else {
+    const range = getActiveRange();
+    if (!range) { alert("Click inside a cell or select it and then click Split."); return; }
+    cell = getCell(range.startContainer);
+    if (!cell) { alert("Place caret inside the cell to split."); return; }
+  }
+
+  const rowIndex = cell.parentNode.rowIndex;
+  const colIndex = cell.cellIndex;
+  const rowSpan  = cell.rowSpan || 1;
+  const colSpan  = cell.colSpan || 1;
+
+  if (rowSpan > 1 || colSpan > 1) {
+    const originalHTML = cell.innerHTML;
+    cell.rowSpan = 1;
+    cell.colSpan = 1;
+
+    for (let r = rowIndex; r < rowIndex + rowSpan; r++) {
+      if (!table.rows[r]) continue;
+      for (let c = colIndex; c < colIndex + colSpan; c++) {
+        if (r === rowIndex && c === colIndex) continue;
+        if (table.rows[r].cells[c]) continue;
+        const newCell = table.rows[r].insertCell(c);
+        newCell.contentEditable = true;
+        newCell.innerHTML = "";
+      }
+    }
+    table.rows[rowIndex].cells[colIndex].innerHTML = originalHTML;
+    clearCellSelectionHighlights();
+    return;
+  }
+
+  const targetRow = table.rows[rowIndex];
+  if (!targetRow) {
+    alert("Row not found; cannot split.");
+    return;
+  }
+  const newCell = targetRow.insertCell(colIndex + 1);
+  newCell.contentEditable = true;
+
+  const originalText = (cell.innerText || "").trim();
+  const [leftText, rightText] = splitTextInTwo(originalText);
+  if (leftText !== "" || rightText !== "") {
+    cell.innerText = leftText;
+    newCell.innerText = rightText;
+  } else {
+    newCell.innerHTML = "";
+  }
+  clearCellSelectionHighlights();
+}
+
+/* ------------------- BOLD TOGGLE ------------------- */
+
+function toggleBold() {
+  const rect = getSelectedRect();
+  if (!rect) return;
+  const { r1, r2, c1, c2 } = rect;
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const cell = table.rows[r].cells[c];
+      if (cell) cell.classList.toggle("bold");
+    }
+  }
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+/* PDF code unchanged */
+async function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const htmlTable = document.querySelector("#tableContainer table");
+  if (!htmlTable) {
+    alert("Table not found!");
+    return;
+  }
+
+  const tablePxWidth = htmlTable.scrollWidth || htmlTable.getBoundingClientRect().width;
+  const tablePtWidth = tablePxWidth * 72 / 96;
+  const portraitWidth  = 595.28 - 80;
+  const landscapeWidth = 841.89 - 80;
+
+  let orientation = (tablePtWidth < portraitWidth * 0.9) ? "portrait" : "landscape";
+
+  const generatePDF = async (orientation) => {
+    const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
+    const logoUrl = "https://raw.githubusercontent.com/Manogna379/enquiry-form/main/reitz_logo.jpg";
+    let logoData = null;
+    try { logoData = await toDataURL(logoUrl); } catch(e){}
+
+    doc.setFontSize(14);
+    doc.text("Technical Specifications of Fan", 40, 40);
+    if (logoData) {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.addImage(logoData, "JPEG", pageWidth - 140, 12, 100, 60);
+    }
+
+    const colCount = htmlTable.rows[0].cells.length;
+    const columnStyles = {};
+    for (let i = 0; i < colCount; i++) {
+      if (i === 0) columnStyles[i] = { cellWidth: 180 };
+      else if (i >= 2 && i <= 4) columnStyles[i] = { cellWidth: 120, overflow: "linebreak" };
+      else columnStyles[i] = { cellWidth: 100, overflow: "linebreak" };
+    }
+
+    doc.autoTable({
+      html: htmlTable,
+      startY: 80,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5,
+        overflow: "linebreak",
+        valign: "middle",
+        halign: "left",
+        font: "helvetica"
+      },
+      columnStyles,
+      headStyles: { fillColor: [240,240,240], textColor: 0, fontStyle: "bold" },
+      didParseCell(data) {
+        const el = data.cell.raw;
+        if (el) {
+          const hasBold = el.querySelector && el.querySelector("b,strong");
+          const weight = window.getComputedStyle(el).fontWeight;
+          const isBold = hasBold || weight === "bold" || parseInt(weight,10) >= 700;
+          if (isBold) data.cell.styles.fontStyle = "bold";
+        }
+      },
+      margin: { left: 40, right: 40 },
+      didDrawPage(data) {
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.getWidth() - 80,
+          doc.internal.pageSize.getHeight() - 20
+        );
+      }
+    });
+    return doc;
+  };
+
+  let doc = await generatePDF(orientation);
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  if (orientation === "portrait" && tablePtWidth > pdfWidth * 0.95) {
+    doc = await generatePDF("landscape");
+  }
+  doc.save("Technical_Specs.pdf");
+}
+
+function toDataURL(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = this.width;
+      canvas.height = this.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(this, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg"));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+</script>
+
+</body>
+</html>
